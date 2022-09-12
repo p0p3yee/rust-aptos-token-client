@@ -2,6 +2,13 @@
 name = "rust-aptos-token-client"
 version = "0.1.0"
 edition = "2021"
+authors = ["p0p3yee <devp0p3yee@gmail.com>"]
+license = "MIT"
+description = "Aptos SDK for interacting with token module"
+homepage = "https://github.com/p0p3yee/rust-aptos-token-client"
+repository = "https://github.com/p0p3yee/rust-aptos-token-client"
+readme = "README.md"
+keywords = ["aptos", "aptos-sdk", "aptos-nft"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

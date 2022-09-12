@@ -1,26 +1,45 @@
-use std::time::{ SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result};
 use aptos_sdk::{
     rest_client::{Client as ApiClient, PendingTransaction},
     types::{
         LocalAccount,
-        chain_id::ChainId,
-        transaction::{TransactionPayload, EntryFunction},
         account_address::AccountAddress,
     },
-    transaction_builder::TransactionBuilder,
     bcs,
-    move_types::{identifier::Identifier, language_storage::ModuleId}
 };
+
+mod module_client;
+use module_client::{ModuleClient, TransactionOptions};
+
+const fn get_hex_address_three() -> AccountAddress {
+    let mut addr = [0u8; AccountAddress::LENGTH];
+    addr[AccountAddress::LENGTH - 1] = 3u8;
+    AccountAddress::new(addr)
+}
 
 #[derive(Clone, Debug)]
 pub struct TokenClient<'a> {
-    api_client: &'a ApiClient
+    api_client: &'a ApiClient,
+    module_client: ModuleClient,
 }
 
 impl<'a> TokenClient<'a> {
-    pub fn new(api_client: &'a ApiClient) -> Self {
-        Self { api_client }
+    pub async fn new(api_client: &'a ApiClient) -> Result<TokenClient<'a>> {
+        let chain_id = api_client
+            .get_index()
+            .await
+            .context("Failed to get chain ID")?
+            .inner()
+            .chain_id;
+        let module_client = ModuleClient::new(
+            chain_id, 
+            get_hex_address_three(),
+            "token"
+        );
+        Ok(Self { 
+            api_client, 
+            module_client,
+        })
     }
 
     pub async fn create_collection_script(
@@ -30,54 +49,31 @@ impl<'a> TokenClient<'a> {
         description: &str,
         uri: &str,
         max_supply: u64,
-        tx_options: Option<TransactionOptions>,
-        options: Option<CollectionOptions>,
+        options: Option<TransactionOptions>,
+        collection_options: Option<CollectionOptions>,
     ) -> Result<PendingTransaction> {
         let options = options.unwrap_or_default();
-        let tx_options = tx_options.unwrap_or_default();
+        let collection_options = collection_options.unwrap_or_default();
+        
+        let signed_txn = self.module_client.build_signed_transaction(
+            from_account,
+            "create_collection_script",
+            vec![],
+            vec![
+                bcs::to_bytes(name).unwrap(),        // Name
+                bcs::to_bytes(description).unwrap(), // Description
+                bcs::to_bytes(uri).unwrap(),         // Uri
+                bcs::to_bytes(&max_supply).unwrap(), // Total Supply ?
+                bcs::to_bytes(&vec![
+                    collection_options.description_mutable, // Description mutable ?
+                    collection_options.uri_mutable,         // URI mutable ?
+                    collection_options.supply_mutable,      // Maximum amount mutable ?
+                ])
+                .unwrap(),
+            ],
+            options,
+        );
 
-        let chain_id = self
-            .api_client
-            .get_index()
-            .await
-            .context("Failed to get chain ID")?
-            .inner()
-            .chain_id;
-
-        let transaction_builder = TransactionBuilder::new(
-            TransactionPayload::EntryFunction(EntryFunction::new(
-                ModuleId::new(
-                    AccountAddress::from_hex("0x3").unwrap(),
-                    Identifier::new("token").unwrap(),
-                ),
-                Identifier::new("create_collection_script").unwrap(),
-                vec![],
-                vec![
-                    bcs::to_bytes(name).unwrap(),        // Name
-                    bcs::to_bytes(description).unwrap(), // Description
-                    bcs::to_bytes(uri).unwrap(),         // Uri
-                    bcs::to_bytes(&max_supply).unwrap(), // Total Supply ?
-                    bcs::to_bytes(&vec![
-                        options.description_mutable, // Description mutable ?
-                        options.uri_mutable,         // URI mutable ?
-                        options.supply_mutable,      // Maximum amount mutable ?
-                    ])
-                    .unwrap(),
-                ],
-            )),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs()
-                + tx_options.timeout_sec,
-            ChainId::new(chain_id),
-        )
-        .sender(from_account.address())
-        .sequence_number(from_account.sequence_number())
-        .max_gas_amount(tx_options.max_gas_amount)
-        .gas_unit_price(tx_options.gas_unit_price);
-
-        let signed_txn = from_account.sign_with_transaction_builder(transaction_builder);
         Ok(self
             .api_client
             .submit(&signed_txn)
@@ -104,60 +100,58 @@ impl<'a> TokenClient<'a> {
         let options = options.unwrap_or_default();
         let property = property.unwrap_or_default();
 
-        let chain_id = self
-            .api_client
-            .get_index()
-            .await
-            .context("Failed to get chain ID")?
-            .inner()
-            .chain_id;
-        
-        let transaction_builder = TransactionBuilder::new(
-            TransactionPayload::EntryFunction(EntryFunction::new(
-                ModuleId::new(
-                    AccountAddress::from_hex("0x3").unwrap(),
-                    Identifier::new("token").unwrap(),
-                ),
-                Identifier::new("create_token_script").unwrap(),
-                vec![],
+        let signed_txn = self.module_client.build_signed_transaction(
+            account,
+            "create_token_script",
+            vec![],
                 vec![
-                    bcs::to_bytes(collection_name).unwrap(),
-                    bcs::to_bytes(name).unwrap(),
-                    bcs::to_bytes(description).unwrap(),
-                    bcs::to_bytes(&supply).unwrap(),
-                    bcs::to_bytes(&max_mint).unwrap(),
-                    bcs::to_bytes(uri).unwrap(),
-                    bcs::to_bytes(&royalty_payee).unwrap(),
-                    bcs::to_bytes(&royalty_points_denominator).unwrap(),
-                    bcs::to_bytes(&royalty_points_numerator).unwrap(),
-                    bcs::to_bytes(&vec![false, false, false, false, false]).unwrap(),
-                    bcs::to_bytes(&property.keys).unwrap(),
-                    bcs::to_bytes(&property.values).unwrap(),
-                    bcs::to_bytes(&property.types).unwrap(),
-                ],
-            )),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs()
-                + options.timeout_sec,
-            ChainId::new(chain_id),
-        )
-        .sender(account.address())
-        .sequence_number(account.sequence_number())
-        .max_gas_amount(options.max_gas_amount)
-        .gas_unit_price(options.gas_unit_price);
+                bcs::to_bytes(collection_name).unwrap(),
+                bcs::to_bytes(name).unwrap(),
+                bcs::to_bytes(description).unwrap(),
+                bcs::to_bytes(&supply).unwrap(),
+                bcs::to_bytes(&max_mint).unwrap(),
+                bcs::to_bytes(uri).unwrap(),
+                bcs::to_bytes(&royalty_payee).unwrap(),
+                bcs::to_bytes(&royalty_points_denominator).unwrap(),
+                bcs::to_bytes(&royalty_points_numerator).unwrap(),
+                bcs::to_bytes(&vec![false, false, false, false, false]).unwrap(),
+                bcs::to_bytes(&property.keys).unwrap(),
+                bcs::to_bytes(&property.values).unwrap(),
+                bcs::to_bytes(&property.types).unwrap(),
+            ],
+            options);
 
-        let signed_txn = account.sign_with_transaction_builder(transaction_builder);
         Ok(self
             .api_client
             .submit(&signed_txn)
             .await
             .context("Failed to submit create token transaction")?
-            .into_inner())
+            .into_inner()
+        )
     }
 
-    pub async fn get_collection_data() {}
+    pub async fn get_collection_data(&self, account: AccountAddress, collection_name: String) -> Option<String>{
+        if let Ok(resources) = self.api_client.get_account_resources(account).await {
+            let resources = resources.into_inner().into_iter().find(|data| {
+                let res = &data.resource_type;
+                res.to_string() == "0x3::token::Collections"
+            });
+            // No NFT
+            if resources.is_none() {
+                return None
+            }
+            let resources = resources.unwrap();
+            // TODO: Parse resouces data to struct
+            // self.api_client.get_table_item(table_handle,
+            //     "0x1::string::String",
+            //     "0x3::token::CollectionData",
+            //     collection_name
+            // );
+            return Some(resources.data.to_string())
+        } else {
+            return None
+        }
+    }
 
     pub async fn get_token() {}
 
@@ -170,26 +164,6 @@ impl<'a> TokenClient<'a> {
     pub async fn claim_token() {}
 
     pub async fn direct_transfer_token() {}
-}
-
-pub struct TransactionOptions {
-    pub max_gas_amount: u64,
-
-    pub gas_unit_price: u64,
-
-    /// This is the number of seconds from now you're willing to wait for the
-    /// transaction to be committed.
-    pub timeout_sec: u64,
-}
-
-impl Default for TransactionOptions {
-    fn default() -> Self {
-        Self {
-            max_gas_amount: 5_000,
-            gas_unit_price: 1,
-            timeout_sec: 10,
-        }
-    }
 }
 
 #[derive(Default)]
