@@ -34,14 +34,25 @@ pub struct TokenProperty {
     pub types: Vec<String>,
 }
 
+#[derive(Default)]
+pub struct RoyaltyPoints {
+    pub denominator: u64,
+    pub numerator: u64,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
-pub struct CollectionDataHandle {
+pub struct Handle {
     pub handle: AccountAddress,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct AccountResources {
-    pub collection_data: CollectionDataHandle
+pub struct CollectionsResources {
+    pub collection_data: Handle
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TokenStoreResources {
+    pub tokens: Handle
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -59,4 +70,36 @@ pub struct CollectionData {
     pub supply: U64,
     pub maximum: U64,
     pub mutability_config: CollectionMutabilityConfig,
+}
+
+
+// NFT Token types
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TokenData {
+    pub collection: String,
+    pub description: String,
+    pub name: String,
+    pub maximum: Option<U64>,
+    pub supply: U64,
+    pub uri: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TokenDataId {
+    pub creator: AccountAddress,
+    pub collection: String,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TokenId {
+    pub token_data_id: TokenDataId,
+    pub property_version: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Token {
+    pub id: TokenId,
+    pub amount: U64,
 }

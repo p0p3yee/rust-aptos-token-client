@@ -19,6 +19,7 @@ async fn main() -> Result<()> {
     let mut alice = LocalAccount::generate(&mut rand::rngs::OsRng);
 
     let collection_name = "Example Collection";
+    let token_name = "First NFT !";
 
     println!("\n=== Address ===");
     println!("Alice: {}", alice.address().to_hex_literal());
@@ -33,6 +34,8 @@ async fn main() -> Result<()> {
             .await
             .context("Failed to get Alice's account balance")?
     );
+
+    println!("\n=== Creating NFT Collection ===");
 
     let tx_hash = token_client.create_collection_script(
         &mut alice,
@@ -50,12 +53,45 @@ async fn main() -> Result<()> {
 
     println!("\n=== NFT Collection Created ===");
 
-    if let Some(data) = token_client.get_collection_data(alice.address(), collection_name.to_string()).await {
-        println!("\nNFT Data: {:?}", data);
-    } else {
-        println!("\nCollection not found ?");
-    }
+    let data = token_client.get_collection_data(
+        alice.address(),
+        collection_name.to_string()
+    )
+    .await.context("Collection not found ?")?;
     
+    println!("Collection Data: {:?}", data);
+
+    println!("\n=== Creating NFT Token for Collection: `{}` ===", collection_name);
+
+    let tx_hash = token_client.create_token(
+        &mut alice,
+        collection_name,
+        token_name,
+        "First NFT Description",
+        1,
+        "First NFT URI",
+        1,
+        None,
+        None,
+        None,
+        None,
+    ).await.context("Failed to submit create token tx")?;
+
+    println!("\nSubmitted Create Token TX: {}", tx_hash.hash.to_string());
+
+    rest_client.wait_for_transaction(&tx_hash).await.context("Failed on waiting create token tx")?;
+
+    println!("\n=== NFT Created ===");
+
+    let data = token_client.get_token(
+        alice.address(),
+        collection_name.to_string(),
+        token_name.to_string(),
+        None,
+    )
+    .await.context("Token not found ?")?;
+    
+    println!("NFT Token Data: {:?}", data);
 
     Ok(())
 }

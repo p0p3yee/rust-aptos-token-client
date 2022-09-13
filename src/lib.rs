@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use anyhow::{Context, Result};
 use aptos_sdk::{
     rest_client::{Client as ApiClient, PendingTransaction},
@@ -13,7 +11,9 @@ use aptos_sdk::{
 mod types;
 mod module_client;
 use module_client::ModuleClient;
-use types::{AccountResources, CollectionOptions, TokenProperty, CollectionData, TransactionOptions};
+use types::{CollectionsResources, CollectionOptions, TokenProperty, CollectionData, TransactionOptions, RoyaltyPoints, Token, TokenId, TokenDataId};
+
+use crate::types::TokenStoreResources;
 
 const fn get_hex_address_three() -> AccountAddress {
     let mut addr = [0u8; AccountAddress::LENGTH];
@@ -95,14 +95,15 @@ impl<'a> TokenClient<'a> {
         supply: u64,
         uri: &str,
         max_mint: u64,
-        royalty_payee: AccountAddress,
-        royalty_points_denominator: u64,
-        royalty_points_numerator: u64,
+        royalty_payee: Option<AccountAddress>,
+        royalty_points: Option<RoyaltyPoints>,
         property: Option<TokenProperty>,
         options: Option<TransactionOptions>,
     ) -> Result<PendingTransaction> {
         let options = options.unwrap_or_default();
         let property = property.unwrap_or_default();
+        let royalty_points = royalty_points.unwrap_or_default();
+        let royalty_payee = royalty_payee.unwrap_or(account.address());
 
         let signed_txn = self.module_client.build_signed_transaction(
             account,
@@ -116,8 +117,8 @@ impl<'a> TokenClient<'a> {
                 bcs::to_bytes(&max_mint).unwrap(),
                 bcs::to_bytes(uri).unwrap(),
                 bcs::to_bytes(&royalty_payee).unwrap(),
-                bcs::to_bytes(&royalty_points_denominator).unwrap(),
-                bcs::to_bytes(&royalty_points_numerator).unwrap(),
+                bcs::to_bytes(&royalty_points.denominator).unwrap(),
+                bcs::to_bytes(&royalty_points.numerator).unwrap(),
                 bcs::to_bytes(&vec![false, false, false, false, false]).unwrap(),
                 bcs::to_bytes(&property.keys).unwrap(),
                 bcs::to_bytes(&property.values).unwrap(),
@@ -145,7 +146,7 @@ impl<'a> TokenClient<'a> {
                 return None
             }
             let resources = resources.unwrap();
-            let v: AccountResources = serde_json::from_str(&resources.data.to_string()).expect("Error on parsing account resources");
+            let v: CollectionsResources = serde_json::from_str(&resources.data.to_string()).expect("Error on parsing account resources");
 
             let result = self.api_client.get_table_item(
                 v.collection_data.handle,
@@ -166,9 +167,49 @@ impl<'a> TokenClient<'a> {
         }
     }
 
-    pub async fn get_token() {}
+    pub async fn get_token(
+        &self, 
+        creator: AccountAddress,
+        collection_name: String,
+        token_name: String,
+        property_version: Option<String>
+    ) -> Option<Token> {
+        let property_version = property_version.unwrap_or("0".to_string());
 
-    pub async fn get_token_for_account() {}
+        let token_data_id = TokenDataId{
+            creator,
+            collection: collection_name,
+            name: token_name,
+        };
+        self.get_token_for_account(creator, TokenId {
+            token_data_id: token_data_id,
+            property_version: property_version,
+        }).await
+    }
+
+    pub async fn get_token_for_account(
+        &self,
+        account: AccountAddress,
+        token_id: TokenId,
+    ) -> Option<Token> {
+        if let Ok(resource) = self.api_client.get_account_resource(account, "0x3::token::TokenStore").await {
+            if let Some(resource) = resource.into_inner() {
+                if let Ok(data) = serde_json::from_str::<TokenStoreResources>(&resource.data.to_string()) {
+                    if let Ok(item) = self.api_client.get_table_item(
+                        data.tokens.handle,
+                        "0x3::token::TokenId",
+                        "0x3::token::Token",
+                        token_id,
+                    ).await {
+                        if let Ok(token) = serde_json::from_str::<Token>(&item.into_inner().to_string()) {
+                            return Some(token)
+                        }
+                    }
+                }
+            }
+        }
+        return None
+    }
 
     pub async fn get_token_data() {}
 
