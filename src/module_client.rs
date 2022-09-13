@@ -10,6 +10,8 @@ use aptos_sdk::{
     move_types::{identifier::Identifier, language_storage::{ModuleId, TypeTag}}
 };
 
+use crate::types::TransactionOptions;
+
 #[derive(Clone, Debug)]
 pub struct ModuleClient {
     chain_id: ChainId,
@@ -62,22 +64,3 @@ impl ModuleClient {
     }
 }
 
-pub struct TransactionOptions {
-    pub max_gas_amount: u64,
-
-    pub gas_unit_price: u64,
-
-    /// This is the number of seconds from now you're willing to wait for the
-    /// transaction to be committed.
-    pub timeout_sec: u64,
-}
-
-impl Default for TransactionOptions {
-    fn default() -> Self {
-        Self {
-            max_gas_amount: 5_000,
-            gas_unit_price: 1,
-            timeout_sec: 10,
-        }
-    }
-}

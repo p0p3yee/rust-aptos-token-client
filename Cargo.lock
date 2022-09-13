@@ -4443,6 +4443,8 @@ dependencies = [
  "aptos-sdk",
  "once_cell",
  "rand 0.7.3",
+ "serde 1.0.144",
+ "serde_json",
  "tokio",
  "url",
 ]

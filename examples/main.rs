@@ -51,7 +51,7 @@ async fn main() -> Result<()> {
     println!("\n=== NFT Collection Created ===");
 
     if let Some(data) = token_client.get_collection_data(alice.address(), collection_name.to_string()).await {
-        println!("\nNFT Data: {}", data);
+        println!("\nNFT Data: {:?}", data);
     } else {
         println!("\nCollection not found ?");
     }

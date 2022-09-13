@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use anyhow::{Context, Result};
 use aptos_sdk::{
     rest_client::{Client as ApiClient, PendingTransaction},
@@ -8,8 +10,10 @@ use aptos_sdk::{
     bcs,
 };
 
+mod types;
 mod module_client;
-use module_client::{ModuleClient, TransactionOptions};
+use module_client::ModuleClient;
+use types::{AccountResources, CollectionOptions, TokenProperty, CollectionData, TransactionOptions};
 
 const fn get_hex_address_three() -> AccountAddress {
     let mut addr = [0u8; AccountAddress::LENGTH];
@@ -130,7 +134,7 @@ impl<'a> TokenClient<'a> {
         )
     }
 
-    pub async fn get_collection_data(&self, account: AccountAddress, collection_name: String) -> Option<String>{
+    pub async fn get_collection_data(&self, account: AccountAddress, collection_name: String) -> Option<CollectionData>{
         if let Ok(resources) = self.api_client.get_account_resources(account).await {
             let resources = resources.into_inner().into_iter().find(|data| {
                 let res = &data.resource_type;
@@ -141,13 +145,22 @@ impl<'a> TokenClient<'a> {
                 return None
             }
             let resources = resources.unwrap();
-            // TODO: Parse resouces data to struct
-            // self.api_client.get_table_item(table_handle,
-            //     "0x1::string::String",
-            //     "0x3::token::CollectionData",
-            //     collection_name
-            // );
-            return Some(resources.data.to_string())
+            let v: AccountResources = serde_json::from_str(&resources.data.to_string()).expect("Error on parsing account resources");
+
+            let result = self.api_client.get_table_item(
+                v.collection_data.handle,
+                "0x1::string::String",
+                "0x3::token::CollectionData",
+                collection_name
+            ).await;
+            let result = result.expect("Error on getting table item");
+            let data = serde_json::from_str::<CollectionData>(&result.into_inner().to_string());
+            if data.is_err() {
+                println!("{:?}", data.err());
+                return None;
+            } else {
+                return Some(data.unwrap())
+            }
         } else {
             return None
         }
@@ -166,16 +179,3 @@ impl<'a> TokenClient<'a> {
     pub async fn direct_transfer_token() {}
 }
 
-#[derive(Default)]
-pub struct CollectionOptions {
-    pub description_mutable: bool,
-    pub uri_mutable: bool,
-    pub supply_mutable: bool,
-}
-
-#[derive(Default)]
-pub struct TokenProperty {
-    pub keys: Vec<String>,
-    pub values: Vec<String>,
-    pub types: Vec<String>,
-}
