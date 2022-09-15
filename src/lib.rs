@@ -3,7 +3,7 @@ use aptos_sdk::{
     rest_client::{Client as ApiClient, PendingTransaction},
     types::{
         LocalAccount,
-        account_address::AccountAddress, transaction::Module,
+        account_address::AccountAddress,
     },
     bcs,
 };
@@ -90,7 +90,8 @@ impl<'a> TokenClient<'a> {
             .submit(&signed_txn)
             .await
             .context("Failed to submit create collection transaction")?
-            .into_inner())
+            .into_inner()
+        )
     }
 
     pub async fn create_token(
@@ -142,36 +143,38 @@ impl<'a> TokenClient<'a> {
         )
     }
 
-    pub async fn get_collection_data(&self, account: AccountAddress, collection_name: String) -> Option<CollectionData>{
-        if let Ok(resources) = self.api_client.get_account_resources(account).await {
-            let resources = resources.into_inner().into_iter().find(|data| {
+    pub async fn get_collection_data(&self, account: AccountAddress, collection_name: String) -> Result<CollectionData>{
+        let resources = self
+            .api_client
+            .get_account_resources(account)
+            .await
+            .context("Account resources not found")?
+            .into_inner()
+            .into_iter()
+            .find(|data| {
                 let res = &data.resource_type;
                 res.to_string() == "0x3::token::Collections"
-            });
-            // No NFT
-            if resources.is_none() {
-                return None
-            }
-            let resources = resources.unwrap();
-            let v: CollectionsResources = serde_json::from_str(&resources.data.to_string()).expect("Error on parsing account resources");
+            })
+            .context("No NFT Collection Found")?;
 
-            let result = self.api_client.get_table_item(
-                v.collection_data.handle,
-                "0x1::string::String",
-                "0x3::token::CollectionData",
-                collection_name
-            ).await;
-            let result = result.expect("Error on getting table item");
-            let data = serde_json::from_str::<CollectionData>(&result.into_inner().to_string());
-            if data.is_err() {
-                println!("{:?}", data.err());
-                return None;
-            } else {
-                return Some(data.unwrap())
-            }
-        } else {
-            return None
-        }
+        let v: CollectionsResources = serde_json::from_str(
+            &resources.data.to_string()
+        ).context("Error on parsing account resources")?;
+
+        let result = self.api_client.get_table_item(
+            v.collection_data.handle,
+            "0x1::string::String",
+            "0x3::token::CollectionData",
+            collection_name
+        )
+        .await
+        .context("Target collection not found in provided account")?;
+
+        let data = serde_json::from_str::<CollectionData>(
+            &result.into_inner().to_string()
+        ).context("Error on parsing collection data")?;
+        
+        Ok(data)
     }
 
     pub async fn get_token(
@@ -180,7 +183,7 @@ impl<'a> TokenClient<'a> {
         collection_name: String,
         token_name: String,
         property_version: Option<String>
-    ) -> Option<Token> {
+    ) -> Result<Token> {
         let property_version = property_version.unwrap_or("0".to_string());
 
         let token_data_id = TokenDataId{
@@ -188,6 +191,7 @@ impl<'a> TokenClient<'a> {
             collection: collection_name,
             name: token_name,
         };
+
         self.get_token_for_account(creator, TokenId {
             token_data_id: token_data_id,
             property_version: property_version,
@@ -198,24 +202,36 @@ impl<'a> TokenClient<'a> {
         &self,
         account: AccountAddress,
         token_id: TokenId,
-    ) -> Option<Token> {
-        if let Ok(resource) = self.api_client.get_account_resource(account, "0x3::token::TokenStore").await {
-            if let Some(resource) = resource.into_inner() {
-                if let Ok(data) = serde_json::from_str::<TokenStoreResources>(&resource.data.to_string()) {
-                    if let Ok(item) = self.api_client.get_table_item(
-                        data.tokens.handle,
-                        "0x3::token::TokenId",
-                        "0x3::token::Token",
-                        token_id,
-                    ).await {
-                        if let Ok(token) = serde_json::from_str::<Token>(&item.into_inner().to_string()) {
-                            return Some(token)
-                        }
-                    }
-                }
-            }
-        }
-        return None
+    ) -> Result<Token> {
+        let resource = self
+            .api_client
+            .get_account_resource(
+                account,
+                "0x3::token::TokenStore"
+            )
+            .await
+            .context("Error on getting account resource")?
+            .into_inner()
+            .context("No Token Found")?;
+
+        let data = serde_json::from_str::<TokenStoreResources>(
+            &resource.data.to_string()
+        ).context("Error on parsing token store resources")?;
+
+        let item = self.api_client.get_table_item(
+            data.tokens.handle,
+            "0x3::token::TokenId",
+            "0x3::token::Token",
+            token_id,
+        )
+        .await
+        .context("Target Token ID not found in provided address")?;
+
+        let token = serde_json::from_str::<Token>(
+            &item.into_inner().to_string()
+        ).context("Error on parsing token")?;
+
+        Ok(token)
     }
 
     pub async fn get_token_data(
@@ -223,28 +239,40 @@ impl<'a> TokenClient<'a> {
         creator: AccountAddress,
         collection_name: String,
         token_name: String,
-    ) -> Option<TokenData> {
-        if let Ok(resource) = self.api_client.get_account_resource(creator, "0x3::token::Collections").await {
-            if let Some(resource) = resource.into_inner() {
-                if let Ok(data) = serde_json::from_str::<TokenStoreResources>(&resource.data.to_string()) {
-                    if let Ok(item) = self.api_client.get_table_item(
-                        data.tokens.handle,
-                        "0x3::token::TokenDataId",
-                        "0x3::token::TokenData",
-                        TokenDataId {
-                            creator,
-                            collection: collection_name,
-                            name: token_name,
-                        },
-                    ).await {
-                        if let Ok(token_data) = serde_json::from_str::<TokenData>(&item.into_inner().to_string()) {
-                            return Some(token_data)
-                        }
-                    }
-                }
-            }
-        }
-        return None
+    ) -> Result<TokenData> {
+        let resource = self
+            .api_client
+            .get_account_resource(
+                creator,
+                "0x3::token::Collections"
+            )
+            .await
+            .context("Error on getting accoutn resource")?
+            .into_inner()
+            .context("No NFT Collection found")?;
+        
+        let data = serde_json::from_str::<TokenStoreResources>(
+            &resource.data.to_string()
+        ).context("Error on parsing token store resources")?;
+
+        let item = self.api_client.get_table_item(
+            data.tokens.handle,
+            "0x3::token::TokenDataId",
+            "0x3::token::TokenData",
+            TokenDataId {
+                creator,
+                collection: collection_name,
+                name: token_name,
+            },
+        )
+        .await
+        .context("Target token not found")?;
+
+        let token_data = serde_json::from_str::<TokenData>(
+            &item.into_inner().to_string()
+        ).context("Error on parsing token data")?;
+        
+        Ok(token_data)
     }
 
     pub async fn offer_token(
