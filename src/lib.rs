@@ -8,12 +8,10 @@ use aptos_sdk::{
     bcs,
 };
 
-mod types;
+pub mod types;
 mod module_client;
 use module_client::ModuleClient;
-use types::{CollectionsResources, CollectionOptions, TokenProperty, CollectionData, TransactionOptions, RoyaltyPoints, Token, TokenId, TokenDataId, TokenData};
-
-use crate::types::TokenStoreResources;
+use types::*;
 
 const fn get_hex_address_three() -> AccountAddress {
     let mut addr = [0u8; AccountAddress::LENGTH];
@@ -182,9 +180,9 @@ impl<'a> TokenClient<'a> {
         creator: AccountAddress,
         collection_name: String,
         token_name: String,
-        property_version: Option<String>
+        property_version: Option<u64>
     ) -> Result<Token> {
-        let property_version = property_version.unwrap_or("0".to_string());
+        let property_version = property_version.unwrap_or(0);
 
         let token_data_id = TokenDataId{
             creator,
@@ -283,10 +281,10 @@ impl<'a> TokenClient<'a> {
         collection_name: String,
         name: String,
         amount: u64,
-        property_version: Option<String>,
+        property_version: Option<u64>,
         options: Option<TransactionOptions>,
     ) -> Result<PendingTransaction> {
-        let property_version = property_version.unwrap_or("0".to_string());
+        let property_version = property_version.unwrap_or(0);
         let options = options.unwrap_or_default();
 
         let signed_txn = self.token_transfer_module_client.build_signed_transaction(
@@ -319,10 +317,10 @@ impl<'a> TokenClient<'a> {
         creator: AccountAddress,
         collection_name: String,
         name: String,
-        property_version: Option<String>,
+        property_version: Option<u64>,
         options: Option<TransactionOptions>,
     ) -> Result<PendingTransaction> {
-        let property_version = property_version.unwrap_or("0".to_string());
+        let property_version = property_version.unwrap_or(0);
         let options = options.unwrap_or_default();
 
         let signed_txn = self.token_transfer_module_client.build_signed_transaction(
@@ -354,10 +352,10 @@ impl<'a> TokenClient<'a> {
         creator: AccountAddress,
         collection_name: String,
         name: String,
-        property_version: Option<String>,
+        property_version: Option<u64>,
         options: Option<TransactionOptions>,
     ) -> Result<PendingTransaction> {
-        let property_version = property_version.unwrap_or("0".to_string());
+        let property_version = property_version.unwrap_or(0);
         let options = options.unwrap_or_default();
         let signed_txn = self.token_transfer_module_client.build_signed_transaction(
             account,
@@ -376,7 +374,7 @@ impl<'a> TokenClient<'a> {
             .api_client
             .submit(&signed_txn)
             .await
-            .context("Failed to submit claim token transaction")?
+            .context("Failed to submit cancel token offer transaction")?
             .into_inner()
         )
     }
@@ -389,10 +387,10 @@ impl<'a> TokenClient<'a> {
         collection_name: String,
         name: String,
         amount: u64,
-        property_version: Option<String>,
+        property_version: Option<u64>,
         options: Option<TransactionOptions>,
     ) -> Result<PendingTransaction> {
-        let property_version = property_version.unwrap_or("0".to_string());
+        let property_version = property_version.unwrap_or(0);
         let options = options.unwrap_or_default();
 
         let mut signers = Vec::<&LocalAccount>::new();
@@ -416,7 +414,7 @@ impl<'a> TokenClient<'a> {
             .api_client
             .submit(&signed_txn)
             .await
-            .context("Failed to submit claim token transaction")?
+            .context("Failed to submit direct transfer token transaction")?
             .into_inner()
         )
     }

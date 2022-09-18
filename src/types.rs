@@ -95,7 +95,7 @@ pub struct TokenDataId {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TokenId {
     pub token_data_id: TokenDataId,
-    pub property_version: String,
+    pub property_version: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
