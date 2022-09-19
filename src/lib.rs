@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use aptos_sdk::{
-    rest_client::{Client as ApiClient, PendingTransaction},
+    rest_client::{Client as ApiClient, PendingTransaction, aptos_api_types::U64},
     types::{
         LocalAccount,
         account_address::AccountAddress,
@@ -192,7 +192,7 @@ impl<'a> TokenClient<'a> {
 
         self.get_token_for_account(creator, TokenId {
             token_data_id: token_data_id,
-            property_version: property_version,
+            property_version: U64(property_version),
         }).await
     }
 
@@ -248,13 +248,13 @@ impl<'a> TokenClient<'a> {
             .context("Error on getting accoutn resource")?
             .into_inner()
             .context("No NFT Collection found")?;
-        
-        let data = serde_json::from_str::<TokenStoreResources>(
+
+        let data = serde_json::from_str::<TokenDataStoreResources>(
             &resource.data.to_string()
-        ).context("Error on parsing token store resources")?;
+        ).context("Error on parsing token data store resources")?;
 
         let item = self.api_client.get_table_item(
-            data.tokens.handle,
+            data.token_data.handle,
             "0x3::token::TokenDataId",
             "0x3::token::TokenData",
             TokenDataId {

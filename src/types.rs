@@ -56,6 +56,11 @@ pub struct TokenStoreResources {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct TokenDataStoreResources {
+    pub token_data: Handle
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct CollectionMutabilityConfig {
     pub description: bool,
     pub maximum: bool,
@@ -77,12 +82,13 @@ pub struct CollectionData {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TokenData {
-    pub collection: String,
-    pub description: String,
-    pub name: String,
     pub maximum: Option<U64>,
+    pub largest_property_version: U64,
     pub supply: U64,
     pub uri: String,
+    // pub royalty
+    pub name: String,
+    pub description: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -95,7 +101,7 @@ pub struct TokenDataId {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TokenId {
     pub token_data_id: TokenDataId,
-    pub property_version: u64,
+    pub property_version: U64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
