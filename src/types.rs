@@ -8,6 +8,8 @@ pub struct TransactionOptions {
     /// This is the number of seconds from now you're willing to wait for the
     /// transaction to be committed.
     pub timeout_sec: u64,
+
+    pub coin_type: String,
 }
 
 impl Default for TransactionOptions {
@@ -16,6 +18,7 @@ impl Default for TransactionOptions {
             max_gas_amount: 5_000,
             gas_unit_price: 1,
             timeout_sec: 10,
+            coin_type: "0x1::aptos_coin::AptosCoin".to_string(),
         }
     }
 }

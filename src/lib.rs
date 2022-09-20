@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use anyhow::{Context, Result};
 use aptos_sdk::{
     rest_client::{Client as ApiClient, PendingTransaction, aptos_api_types::U64},
@@ -5,7 +7,7 @@ use aptos_sdk::{
         LocalAccount,
         account_address::AccountAddress,
     },
-    bcs,
+    bcs, move_types::language_storage::TypeTag,
 };
 
 pub mod types;
@@ -137,6 +139,42 @@ impl<'a> TokenClient<'a> {
             .submit(&signed_txn)
             .await
             .context("Failed to submit create token transaction")?
+            .into_inner()
+        )
+    }
+
+    pub async fn burn_token(
+        &self,
+        account: &mut LocalAccount,
+        creator: AccountAddress,
+        collection_name: &str,
+        name: &str,
+        amount: u64,
+        property_version: Option<u64>,
+        options: Option<TransactionOptions>,
+    ) -> Result<PendingTransaction> {
+        let options = options.unwrap_or_default();
+        let property_version = property_version.unwrap_or_default();
+
+        let signed_txn = self.module_client.build_signed_transaction(
+            account,
+            "burn",
+            vec![],
+                vec![
+                bcs::to_bytes(&creator).unwrap(),
+                bcs::to_bytes(collection_name).unwrap(),
+                bcs::to_bytes(name).unwrap(),
+                bcs::to_bytes(&property_version).unwrap(),
+                bcs::to_bytes(&amount).unwrap(),
+            ],
+            options
+        );
+
+        Ok(self
+            .api_client
+            .submit(&signed_txn)
+            .await
+            .context("Failed to submit burn token transaction")?
             .into_inner()
         )
     }
@@ -390,7 +428,7 @@ impl<'a> TokenClient<'a> {
         property_version: Option<u64>,
         options: Option<TransactionOptions>,
     ) -> Result<PendingTransaction> {
-        let property_version = property_version.unwrap_or(0);
+        let property_version = property_version.unwrap_or_default();
         let options = options.unwrap_or_default();
 
         let mut signers = Vec::<&LocalAccount>::new();
@@ -415,6 +453,47 @@ impl<'a> TokenClient<'a> {
             .submit(&signed_txn)
             .await
             .context("Failed to submit direct transfer token transaction")?
+            .into_inner()
+        )
+    }
+
+    pub async fn list_token_for_swap(
+        &self,
+        account: &mut LocalAccount,
+        creator: AccountAddress,
+        collection: String,
+        name: String,
+        amount: u64,
+        min_coin_per_token: u64,
+        locked_until_secs: u64,
+        property_version: Option<u64>,
+        options: Option<TransactionOptions>,
+    ) -> Result<PendingTransaction> {
+        let property_version = property_version.unwrap_or_default();
+        let options = options.unwrap_or_default();
+
+        let signed_txn = self.token_transfer_module_client.build_signed_transaction(
+            account,
+            "list_token_for_swap",
+            vec![
+                TypeTag::from_str(&options.coin_type).unwrap()
+            ],
+            vec![
+                bcs::to_bytes(&creator).unwrap(),
+                bcs::to_bytes(&collection).unwrap(),
+                bcs::to_bytes(&name).unwrap(),
+                bcs::to_bytes(&property_version).unwrap(),
+                bcs::to_bytes(&amount).unwrap(),
+                bcs::to_bytes(&min_coin_per_token).unwrap(),
+                bcs::to_bytes(&locked_until_secs).unwrap(),
+            ],
+            options);
+
+        Ok(self
+            .api_client
+            .submit(&signed_txn)
+            .await
+            .context("Failed to submit list token for swap transaction")?
             .into_inner()
         )
     }
