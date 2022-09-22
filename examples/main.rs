@@ -162,9 +162,72 @@ async fn main() -> Result<()> {
     .await;
 
     if result.is_err() {
-        println!("Expected Token Not Found Error | Token already transferred to Bob.")
+        println!("\n=== Expected Token Not Found Error for getting Alice's Token | Token already transferred to Bob ===")
     } else {
-        println!("Unexpected, Token should be transferred to Bob");
+        println!("\n=== Unexpected, Token should be transferred to Bob ===");
+    }
+
+    println!("\n=== Bob offer token to Alice ===");
+
+    let offer_count_before = token_client.get_token_offer_count(bob.address()).await.unwrap_or(0u64);
+
+    let tx_hash = token_client.offer_token(
+        &mut bob,
+        alice.address(),
+        creator_address,
+        collection_name.to_string(),
+        token_name.to_string(),
+        1,
+        None,
+        None
+    ).await?;
+
+    rest_client.wait_for_transaction(&tx_hash).await.context("Failed on waiting bob offer token to alice tx")?;
+
+    println!("\n=== Offer sent {} ===", tx_hash.hash.to_string());
+
+    let offer_count_after = token_client.get_token_offer_count(bob.address()).await?;
+
+    assert!(offer_count_after > offer_count_before, "Unexpected, offer count is the same after offering");
+
+    println!("\n=== Bob cancel offer to alice ===");
+
+    let cancel_offer_count_before = token_client.get_cancel_offer_count(bob.address()).await.unwrap_or(0u64);
+
+    let tx_hash = token_client.cancel_token_offer(
+        &mut bob,
+        alice.address(),
+        creator_address,
+        collection_name.to_string(),
+        token_name.to_string(),
+        None,
+        None
+    ).await?;
+
+    rest_client.wait_for_transaction(&tx_hash).await.context("Failed on waiting bob cancel offer tx")?;
+
+    let cancel_offer_count_after = token_client.get_cancel_offer_count(bob.address()).await?;
+
+    assert!(cancel_offer_count_after > cancel_offer_count_before, "Unexpected, cancel offer count is the same after cancelling offer");
+
+    println!("\n=== Alice try to accpet offer now ===");
+
+    let tx_hash = token_client.claim_token(
+        &mut alice, 
+        bob.address(), 
+        creator_address, 
+        collection_name.to_string(), 
+        token_name.to_string(),
+        None,
+    None
+    ).await?;
+
+    let result = rest_client.wait_for_transaction(&tx_hash).await;
+
+    if result.is_err() {
+        println!("Expected Accept Offer Tx Error | Offer already cancelled.")
+    } else {
+        println!("Unexpected, Offer should already cancelled");
     }
 
     Ok(())

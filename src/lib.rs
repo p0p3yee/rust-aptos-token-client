@@ -497,5 +497,52 @@ impl<'a> TokenClient<'a> {
             .into_inner()
         )
     }
+
+    pub async fn get_pending_claims_resources_for_account(
+        &self,
+        account: AccountAddress,
+    ) -> Result<PendingClaimsResources> {
+        let resource = self
+            .api_client
+            .get_account_resource(
+                account,
+                "0x3::token_transfers::PendingClaims"
+            )
+            .await
+            .context("Error on getting account resource <0x3::token_transfers::PendingClaims>")?
+            .into_inner()
+            .context("No Pending Claims Found")?;
+
+        let data = serde_json::from_str::<PendingClaimsResources>(
+            &resource.data.to_string()
+        ).context("Error on parsing pending claims resource")?;
+
+        return Ok(data);
+    }
+
+    pub async fn get_token_offer_count(
+        &self,
+        account: AccountAddress,
+    ) -> Result<u64> {
+        let data = self.get_pending_claims_resources_for_account(account).await?;
+        Ok(data.offer_events.counter.0)
+    }
+
+    pub async fn get_token_claim_count(
+        &self,
+        account: AccountAddress,
+    ) -> Result<u64> {
+        let data = self.get_pending_claims_resources_for_account(account).await?;
+        Ok(data.claim_events.counter.0)
+    }
+
+    pub async fn get_cancel_offer_count(
+        &self,
+        account: AccountAddress,
+    ) -> Result<u64> {
+        let data = self.get_pending_claims_resources_for_account(account).await?;
+        Ok(data.cancel_offer_events.counter.0)
+    }
+
 }
 

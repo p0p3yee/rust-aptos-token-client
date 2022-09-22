@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use aptos_sdk::{types::account_address::AccountAddress, rest_client::aptos_api_types::U64};
+use aptos_sdk::{types::{account_address::AccountAddress}, rest_client::{aptos_api_types::U64}};
 pub struct TransactionOptions {
     pub max_gas_amount: u64,
 
@@ -44,18 +44,52 @@ pub struct RoyaltyPoints {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct EventHandle {
+    pub counter: U64,
+    pub guid: Guid,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Guid {
+    pub id: ID,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ID {
+    pub addr: AccountAddress,
+    pub creation_num: U64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Handle {
     pub handle: AccountAddress,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CollectionsResources {
-    pub collection_data: Handle
+    pub collection_data: Handle,
+    pub create_collection_events: EventHandle,
+    pub create_token_data_events: EventHandle,
+    pub mint_token_events: EventHandle,
+    pub token_data: Handle,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TokenStoreResources {
-    pub tokens: Handle
+    pub burn_events: EventHandle,
+    pub deposit_events: EventHandle,
+    pub direct_transfer: bool,
+    pub mutate_token_property_events: EventHandle,
+    pub tokens: Handle,
+    pub withdraw_events: EventHandle
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PendingClaimsResources {
+    pub cancel_offer_events: EventHandle,
+    pub claim_events: EventHandle,
+    pub offer_events: EventHandle,
+    pub pending_claims: Handle,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
