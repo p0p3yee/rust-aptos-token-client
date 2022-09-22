@@ -26,8 +26,8 @@ async fn main() -> Result<()> {
     println!("Alice: {}", alice.address().to_hex_literal());
     println!("Bob: {}", bob.address().to_hex_literal());
 
-    faucet_client.fund(alice.address(), 20_000).await.context("Failed to fund Alice's account")?;
-    faucet_client.fund(bob.address(), 20_000).await.context("Failed to fund Bob's account")?;
+    faucet_client.fund(alice.address(), 1_000_000).await.context("Failed to fund Alice's account")?;
+    faucet_client.fund(bob.address(), 1_000_000).await.context("Failed to fund Bob's account")?;
 
     println!("\n=== Initial Balances ===");
     println!(
