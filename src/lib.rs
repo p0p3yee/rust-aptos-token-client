@@ -434,7 +434,7 @@ impl<'a> TokenClient<'a> {
         let mut signers = Vec::<&LocalAccount>::new();
         signers.push(receiver);
 
-        let signed_txn = self.token_transfer_module_client.build_multisigned_transaction(
+        let signed_txn = self.module_client.build_multisigned_transaction(
             account,
             signers,
             "direct_transfer_script",
